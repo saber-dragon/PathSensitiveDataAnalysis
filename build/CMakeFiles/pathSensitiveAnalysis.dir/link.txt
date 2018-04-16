@@ -1,0 +1,2 @@
+/usr/bin/clang++ -fPIC -Wall -fno-rtti  -shared -Wl,-soname,libpathSensitiveAnalysis.so -o libpathSensitiveAnalysis.so CMakeFiles/pathSensitiveAnalysis.dir/src/pathSensitiveAnalysis.cpp.o  -L/usr/lib/llvm-4.0/lib
+ 

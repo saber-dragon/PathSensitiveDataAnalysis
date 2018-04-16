@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(DemandDrivenDefUseAnalysis)
+project(PathSensitiveAnalysis)
 
 enable_testing()
 
@@ -86,7 +86,7 @@ endfunction()
 
 # Copy all "*.ll" test files to the destination directory
 # Note that you can add other file types (e.g., *.bc) if you want to use them as test files.
-file(GLOB TEST_FILES "${PROJECT_SOURCE_DIR}/test/*.ll")
+file(GLOB TEST_FILES "${PROJECT_SOURCE_DIR}/tests/*.ll")
 foreach(test_file ${TEST_FILES})
     get_filename_component(file_we ${test_file} NAME)
     message(STATUS "Copying ${file_we} ...")
@@ -98,9 +98,25 @@ message(STATUS "Get the following test files: ${test_filenames}")
 
 
 # copy benchmark to build
-file(COPY "${PROJECT_SOURCE_DIR}/benchmark" DESTINATION "${PROJECT_BINARY_DIR}")
-file(COPY "${PROJECT_SOURCE_DIR}/script" DESTINATION "${PROJECT_BINARY_DIR}")
-file(GLOB HEADERS "*.hpp" "*.h")
+file(COPY "${PROJECT_SOURCE_DIR}/benchmarks" DESTINATION "${PROJECT_BINARY_DIR}")
+file(COPY "${PROJECT_SOURCE_DIR}/scripts" DESTINATION "${PROJECT_BINARY_DIR}")
+file(GLOB HEADERS "*.hpp" "*.h" "${PROJECT_SOURCE_DIR}/dependencies/*.hpp")
+
+
+include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/dependencies")
+#
+set(src "${PROJECT_SOURCE_DIR}/src/pathSensitiveAnalysis.cpp")
+get_filename_component(src_we ${src} NAME_WE)
+set(PASS_NAME "${src_we}")
+set(libname "${src_we}")
+message(STATUS "adding a library for ${src} named ${libname}")
+configure_file(
+        "${PROJECT_SOURCE_DIR}/configs/PathSensitiveAnalysis.h.in"
+        "${PROJECT_BINARY_DIR}/PathSensitiveAnalysisConfig.h"
+)
+add_library(${libname} SHARED ${HEADERS} ${src})
+add_llvm_pass_tests("$<TARGET_FILE:${libname}>" "${libname}" "${test_filenames}")
+
 
 
 
