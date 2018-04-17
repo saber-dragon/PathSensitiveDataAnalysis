@@ -1,15 +1,35 @@
-int foo(int a){
-    int x = 1;
+int foo(int a, int b){
+    int x;
     int y = 2;
 
-    int z = x + y;
+    if (a > 10){
+        x = 1;
+    } else if (a > 5){
+        x = 3;
+    } else if (a > 0){
+        x = 100;
+    } else {
+        x = a;
+    }
 
-    int w = x;
-    int p = y;
+    D: {
+        if (x == 8){
+            y = a;
+        } else if (x == 9){
+            y = b;
+        } else {
+            y = a + b;
+        }
+    }
 
-    int q = w + p;
+    y = x;
 
-    int f = z + q;
+    if (y > a){
+        y = b;
+    }else {
+        y = a;
+    }
 
-    return f;
+
+    return (x + y);
 }

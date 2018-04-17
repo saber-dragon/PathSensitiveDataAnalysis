@@ -178,12 +178,6 @@ CMAKE_STRIP:FILEPATH=/usr/bin/strip
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
 //Value Computed by CMake
-DemandDrivenDefUseAnalysis_BINARY_DIR:STATIC=/home/saber/GitHub/PathSensitiveAnalysis/build
-
-//Value Computed by CMake
-DemandDrivenDefUseAnalysis_SOURCE_DIR:STATIC=/home/saber/GitHub/PathSensitiveAnalysis
-
-//Value Computed by CMake
 PathSensitiveAnalysis_BINARY_DIR:STATIC=/home/saber/GitHub/PathSensitiveAnalysis/build
 
 //Value Computed by CMake

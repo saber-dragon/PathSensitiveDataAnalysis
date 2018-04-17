@@ -6,5 +6,5 @@ CXX_FLAGS = -Wall -fno-rtti -fPIC   -std=gnu++11
 
 CXX_DEFINES = -DpathSensitiveAnalysis_EXPORTS
 
-CXX_INCLUDES = -I/usr/lib/llvm-4.0/include -I/home/saber/GitHub/PathSensitiveAnalysis/build -I/home/saber/GitHub/PathSensitiveAnalysis -I/home/saber/GitHub/PathSensitiveAnalysis/dependencies 
+CXX_INCLUDES = -I/home/saber/Downloads/llvm-4.0.1.src/include -I/home/saber/GitHub/PathSensitiveAnalysis/build -I/home/saber/GitHub/PathSensitiveAnalysis -I/home/saber/GitHub/PathSensitiveAnalysis/dependencies 
 

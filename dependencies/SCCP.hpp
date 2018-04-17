@@ -339,6 +339,13 @@ namespace {
             return true;
         }
 
+
+        // Public function extended
+        // check whether @PHI is destructive
+        bool isDestructiveMerge(PHINode *PHI);
+        // get splits of @PHI
+        std::vector<std::vector<int> > getSplitsOfDestructiveMerge(PHINode* PHI);
+
     private:
         // pushToWorkList - Helper for markConstant/markForcedConstant/markOverdefined
         void pushToWorkList(LatticeVal &IV, Value *V) {
@@ -1504,6 +1511,45 @@ bool SCCPSolver::ResolvedUndefsIn(Function &F) {
     }
 
     return false;
+}
+
+// This function checks whether PHINode @PHI is a destructive merge or not
+bool SCCPSolver::isDestructiveMerge(PHINode *PHI) {
+    if (PHI->getType()->isStructTy()) return false;
+    if (PHI->getNumIncomingValues() > 16) return false;
+    if (getLatticeValueFor(PHI).isConstant()) return false;
+
+    for (unsigned i = 0, e = PHI->getNumIncomingValues(); i != e; ++i) {
+        LatticeVal IV = getLatticeValueFor(PHI->getIncomingValue(i));
+        if (IV.isUnknown()) continue;  // Doesn't influence PHI node.
+        if (!isEdgeFeasible(PHI->getIncomingBlock(i), PHI->getParent()))
+            continue;
+        if (IV.isOverdefined()) continue;
+        if (IV.isConstant()) return true;
+    }
+    return false;
+}
+
+std::vector<std::vector<int> > SCCPSolver::getSplitsOfDestructiveMerge(PHINode *PHI) {
+    std::vector<std::vector<int> > Splits;
+    Splits.emplace_back(std::vector<int>());//
+    DenseMap<Constant *, int> ConstType;
+
+    for (unsigned i = 0, e = PHI->getNumIncomingValues(); i != e; ++i) {
+        LatticeVal IV = getLatticeValueFor(PHI->getIncomingValue(i));
+        if (IV.isUnknown() || IV.isOverdefined() || !isEdgeFeasible(PHI->getIncomingBlock(i), PHI->getParent()))
+            Splits.front().emplace_back(i);
+        else {
+            Constant * C = IV.getConstant();
+            if (! ConstType.count(C)) {
+                ConstType.insert({C, static_cast<const int &>(Splits.size())});
+                Splits.emplace_back(std::vector<int>());
+            }
+            Splits[ConstType[C]].emplace_back(i);
+        }
+    }
+
+    return Splits;
 }
 
 static bool tryToReplaceWithConstant(SCCPSolver &Solver, Value *V) {

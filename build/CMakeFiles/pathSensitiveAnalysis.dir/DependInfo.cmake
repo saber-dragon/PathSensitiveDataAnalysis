@@ -10,7 +10,7 @@ set(CMAKE_CXX_COMPILER_ID "Clang")
 
 # The include file search paths:
 set(CMAKE_CXX_TARGET_INCLUDE_PATH
-  "/usr/lib/llvm-4.0/include"
+  "/home/saber/Downloads/llvm-4.0.1.src/include"
   "."
   "../"
   "../dependencies"

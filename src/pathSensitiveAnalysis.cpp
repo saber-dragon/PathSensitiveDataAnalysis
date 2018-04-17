@@ -45,7 +45,7 @@
 
 
 #include <set>
-
+#include <unordered_map>
 #include "PathSensitiveAnalysisConfig.h"
 
 #include "SCCP.hpp"
@@ -87,25 +87,12 @@ namespace {
         return true;
     }
 
+
     struct PathSensitiveAnalysis : FunctionPass {
         static char ID;
 
         PathSensitiveAnalysis() : FunctionPass(ID) {}
-//    struct PathSensitiveAnalysis : ModulePass {
-//        static char ID;
 
-//        PathSensitiveAnalysis() : ModulePass(ID) {}
-
-//        bool runOnModule(Module &M) override {
-//            bool Change = false;
-//
-//            const DataLayout &DL = M.getDataLayout();
-//            TargetLibraryInfo *TLI =
-//                    &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
-//
-//
-//            return Change;
-//        }
         bool runOnFunction(Function &F) override {
             if (skipFunction(F)) return false;
             bool Change = false;
@@ -139,11 +126,18 @@ namespace {
                     Instruction *Inst = &*BI++;
                     if (Inst->getType()->isVoidTy() || isa<TerminatorInst>(Inst))
                         continue;
+                    if (auto* PHI = dyn_cast<PHINode>(Inst)){
+                        if (Solver.isDestructiveMerge(PHI)){
+                            errs() << toString(PHI)
+                                   << " is a destructive merge.\n"
+                                   << "its region of influence is ";
+                            for (auto UI = PHI->use_begin(), UE = PHI->use_end();UI != UE;){
+                                Use *U = &*UI++;
+                                errs() << toString(U) << "\n";
+                            }
+                            errs() << "--------------------------------------------\n";
+                        }
 
-                    if (isConstant(Solver, Inst)){
-                        errs() << "Get a constant : "
-                               << toString(Inst)
-                               << "\n";
                     }
                 }
             }
@@ -151,39 +145,7 @@ namespace {
 
             return Change;
         }
-//            errs() << "runOnFunction("
-//                   << F.getName()
-//                   << ") : \n";
-//
-//            std::set<Instruction*> WorkList;
-//            for(Instruction &I: instructions(F)){
-//                WorkList.insert(&I);
-//            }
-//            const DataLayout &DL = F.getParent()->getDataLayout();
-//            TargetLibraryInfo *TLI =
-//                    &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
-//
-//            while (!WorkList.empty()) {
-//                Instruction *I = *WorkList.begin();
-////                errs() << toString(I) << "\n";
-//
-//                WorkList.erase(WorkList.begin());    // Get an element from the worklist...
-//
-//                if (!I->use_empty()){
-//                    if (Constant *C = ConstantFoldInstruction(I, DL, TLI)) {
-//                        errs() << toString(I) << " : \n";
-//                        for (User *U : I->users()){
-//                            errs() << "\t"
-//                                   << toString(U)
-//                                   << "\n";
-//                        }
-//                        errs() << "---------------------------------------\n\n";
-//                    }
-//                }
-//            }
-//
-//            return false;  // change CFG
-//        }
+
         void getAnalysisUsage(AnalysisUsage &AU) const override {
             AU.setPreservesCFG();
             AU.addRequired<TargetLibraryInfoWrapperPass>();
