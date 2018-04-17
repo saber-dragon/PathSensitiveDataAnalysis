@@ -48,8 +48,8 @@ qrc_*.cpp
 ui_*.h
 *.qmlc
 *.jsc
-Makefile*
 *build-*
+
 
 # Qt unit tests
 target_wrapper.*
@@ -493,3 +493,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+
+build 
