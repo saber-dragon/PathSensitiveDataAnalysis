@@ -103,6 +103,9 @@ file(COPY "${PROJECT_SOURCE_DIR}/scripts" DESTINATION "${PROJECT_BINARY_DIR}")
 file(GLOB HEADERS "*.hpp" "*.h" "${PROJECT_SOURCE_DIR}/dependencies/*.hpp")
 
 
+
+set(VERBOSE_LEVEL 1)
+
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/dependencies")
 #
 set(src "${PROJECT_SOURCE_DIR}/src/pathSensitiveAnalysis.cpp")

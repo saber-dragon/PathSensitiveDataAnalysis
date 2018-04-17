@@ -90,11 +90,46 @@ namespace {
         return TransitiveClosureBB;
     }
 
+    void TryToAddDestructiveMerge(std::vector<double>& BestFitness,
+                                  std::vector<std::set<Instruction*> >& RoI,
+                                  std::vector<PHINode*>& DestructiveMerges,
+                                 PHINode* PHI,
+                                 double MyFitness,
+                                std::set<Instruction*>& MyRoI){
+        assert(BestFitness.size() == 2 && "Sorry! This implementation only handles the best two guys!");
+
+        if (DestructiveMerges.size() == 0){
+            DestructiveMerges.emplace_back(PHI);
+            BestFitness.front() = MyFitness;
+            RoI.front() = MyRoI;
+        } else if (DestructiveMerges.size() == 0){
+            if (MyFitness > BestFitness.front()){
+                DestructiveMerges.insert(DestructiveMerges.begin(), PHI);
+                BestFitness.back() = BestFitness.front();
+                BestFitness.front() = MyFitness;
+                RoI.back() = RoI.front();
+                RoI.front() = MyRoI;
+            } else {
+                DestructiveMerges.emplace_back(PHI);
+                BestFitness.back() = MyFitness;
+                RoI.back() = MyRoI;
+            }
+        } else {
+            if (MyFitness > BestFitness.front()) {
+                BestFitness.front() = MyFitness;
+                RoI.front() = MyRoI;
+            } else {
+                BestFitness.back() = MyFitness;
+                RoI.back() = MyRoI;
+            }
+        }
+    }
     void GetRoISmall(PHINode *PHI,
                 const std::set<Instruction*>& InfluencedNodes,
                 const std::unordered_map<BasicBlock*, std::set<BasicBlock*> >& TCBB,
                 std::vector<double>& BestFitness,
-                std::vector<std::set<Instruction*> >& RoI){
+                std::vector<std::set<Instruction*> >& RoI,
+                std::vector<PHINode*>& DestructiveMerges){
 
         std::set<Instruction*> MyRoI;
         BasicBlock* BBPHI = PHI->getParent();
@@ -109,7 +144,8 @@ namespace {
                         while (!InstPtr)
                             MyRoI.insert(InstPtr);
 
-                        if (InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
+                        if (DestructiveMerges.size() == 2 &&
+                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
                             return;
                         }
                     }
@@ -121,21 +157,15 @@ namespace {
                 do{
                     if (!InstPtr) {
                         MyRoI.insert(InstPtr);
-                        if (InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
+                        if (DestructiveMerges.size() == 2 &&
+                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
                             return;
                     }
                 } while (!InstPtr || InstPtr != U_INFL);
             }
         }
         double MyFitness = InfluencedNodes.size() * 1.0 / MyRoI.size();
-        assert(BestFitness.size() == 2 && "Sorry! This implementation only handles two best guys!");
-        if (MyFitness > BestFitness.front()) {
-            BestFitness.front() = MyFitness;
-            RoI.front() = MyRoI;
-        } else {
-            BestFitness.back() = MyFitness;
-            RoI.back() = MyRoI;
-        }
+        TryToAddDestructiveMerge(BestFitness, RoI, DestructiveMerges, PHI, MyFitness, MyRoI);
     }
     void GetRoILarge(PHINode *PHI,
                      const std::set<Instruction*>& InfluencedNodes,
@@ -143,7 +173,8 @@ namespace {
                      const DominatorTree *DT,
                      const LoopInfo *LI,
                      std::vector<double>& BestFitness,
-                     std::vector<std::set<Instruction*> >& RoI){
+                     std::vector<std::set<Instruction*> >& RoI,
+                     std::vector<PHINode*>& DestructiveMerges){
 
         std::set<Instruction*> MyRoI;
         BasicBlock* BBPHI = PHI->getParent();
@@ -160,7 +191,8 @@ namespace {
                         while (!InstPtr)
                             MyRoI.insert(InstPtr);
 
-                        if (InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
+                        if (DestructiveMerges.size() == 2 &&
+                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
                             return;
                         }
                     }
@@ -172,45 +204,16 @@ namespace {
                 do{
                     if (!InstPtr) {
                         MyRoI.insert(InstPtr);
-                        if (InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
+                        if (DestructiveMerges.size() == 2 &&
+                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
                             return;
                     }
                 } while (!InstPtr || InstPtr != U_INFL);
             }
         }
         double MyFitness = InfluencedNodes.size() * 1.0 / MyRoI.size();
-        assert(BestFitness.size() == 2 && "Sorry! This implementation only handles two best guys!");
-        if (MyFitness > BestFitness.front()) {
-            BestFitness.front() = MyFitness;
-            RoI.front() = MyRoI;
-        } else {
-            BestFitness.back() = MyFitness;
-            RoI.back() = MyRoI;
-        }
+        TryToAddDestructiveMerge(BestFitness, RoI, DestructiveMerges, PHI, MyFitness, MyRoI);
     }
-//    bool isConstant(SCCPSolver& Solver, Value *V){
-//        Constant *Const = nullptr;
-//        if (V->getType()->isStructTy()) {
-//            std::vector<LatticeVal> IVs = Solver.getStructLatticeValueFor(V);
-//            if (any_of(IVs, [](const LatticeVal &LV) { return LV.isOverdefined(); }))
-//                return false;
-//            std::vector<Constant *> ConstVals;
-//            auto *ST = dyn_cast<StructType>(V->getType());
-//            for (unsigned i = 0, e = ST->getNumElements(); i != e; ++i) {
-//                LatticeVal V = IVs[i];
-//                ConstVals.push_back(V.isConstant()
-//                                    ? V.getConstant()
-//                                    : UndefValue::get(ST->getElementType(i)));
-//            }
-//            Const = ConstantStruct::get(ST, ConstVals);
-//        } else {
-//            LatticeVal IV = Solver.getLatticeValueFor(V);
-//            if (IV.isOverdefined())
-//                return false;
-//            Const = IV.isConstant() ? IV.getConstant() : UndefValue::get(V->getType());
-//        }
-//        return true;
-//    }
 
     struct PathSensitiveAnalysis : FunctionPass {
         static char ID;
@@ -232,6 +235,7 @@ namespace {
             std::unordered_map<PHINode*, std::set<Instruction*> > InfluencedNodes;
             std::vector<std::set<Instruction*> > RoI(2);
             std::vector<double> BestFitness(2, 0);
+            std::vector<PHINode*> DestructiveMerges;
 
             SCCPSolver Solver(DL, TLI);
 
@@ -255,7 +259,7 @@ namespace {
                 TCBB = GetReachableNodes(F);
             }
 
-            double f1 = 0, f2 = 0;
+
             for (BasicBlock &BB : F) {
                 if (!Solver.isBlockExecutable(&BB)) continue;
                 // Iterate over all of the instructions in a function, replacing them with
@@ -266,18 +270,15 @@ namespace {
                     if (Inst->getType()->isVoidTy() || isa<TerminatorInst>(Inst))
                         continue;
                     if (auto* PHI = dyn_cast<PHINode>(Inst)){
-
                         if (Solver.isDestructiveMerge(PHI)){
                             errs() << toString(PHI)
                                    << " is a destructive merge.\n"
-                                   << "its region of influence is ";
+                                   << "its influence is ";
                             for (auto UI = PHI->user_begin(), UE = PHI->user_end();UI != UE;){
                                 User *U = *UI++;
                                 if (Instruction *I = dyn_cast<Instruction>(U)) {
                                     if (!InfluencedNodes.count(PHI)) {
                                         InfluencedNodes[PHI] = std::set<Instruction*>();
-                                        // RoI[PHI] = std::set<Instruction*>();
-                                        // RoISize[PHI] = 0;
                                     }
                                     InfluencedNodes[PHI].insert(I);
                                     errs() << toString(I) << "\n";
@@ -285,10 +286,10 @@ namespace {
                             }
                             errs() << "--------------------------------------------\n";
 
-                            if (F.size() <= 64) GetRoISmall(PHI, InfluencedNodes.at(PHI), TCBB, BestFitness, RoI);
+                            if (F.size() <= 64) GetRoISmall(PHI, InfluencedNodes.at(PHI), TCBB, BestFitness, RoI, DestructiveMerges);
                             else GetRoILarge(
                                     PHI, InfluencedNodes.at(PHI), F, DT, LI,
-                                    BestFitness, RoI
+                                    BestFitness, RoI, DestructiveMerges
                                     );
                         }
                     }
@@ -296,7 +297,21 @@ namespace {
             }
 
 
+#if (PATH_SENS_VERBOSE_LEVEL > 0)
+        int i = 0;
+        for (const auto& D: DestructiveMerges){
+                errs() << "Destructive merge: " << toString(D) << "\n";
+                errs() << "\tInfluenced nodes of it:\n";
+                for (const auto& I: InfluencedNodes.at(D))
+                    errs() << "\t\t" << toString(I) << "\n";
 
+                errs() << "\tRegion of influence of it:\n";
+                for (const auto& R: RoI[i]){
+                    errs() << "\t\t" << toString(R) << "\n";
+                }
+                ++ i;
+        }
+#endif
 
             return Change;
         }
