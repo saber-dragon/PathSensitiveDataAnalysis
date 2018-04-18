@@ -104,7 +104,7 @@ file(GLOB HEADERS "*.hpp" "*.h" "${PROJECT_SOURCE_DIR}/dependencies/*.hpp")
 
 
 
-set(VERBOSE_LEVEL 1)
+set(VERBOSE_LEVEL 2)
 
 include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/dependencies")
 #

@@ -67,27 +67,73 @@ namespace {
         return vStr;
     }
 
-    std::unordered_map<BasicBlock*, std::set<BasicBlock*> > GetReachableNodes(Function &F){
-        std::unordered_map<BasicBlock*, std::set<BasicBlock*> > TransitiveClosureBB;
+    template <>
+    std::string toString(const Instruction* val) {
+        std::string vStr;
+        raw_string_ostream os(vStr);
+        val->print(os);
+        return (vStr + " (BasicBlock: " + val->getParent()->getName().str() + ")");
+    }
+
+    template <>
+    std::string toString(const PHINode* val) {
+        return toString(dyn_cast<Instruction>(val));
+    }
+
+    void GetReachableNodes(Function &F,
+                           const DenseMap<BasicBlock*, int>& ID,
+                           std::vector<std::vector<bool> >& TransitiveClosureBB){
         for (BasicBlock &BB : F) {
             auto *TI = BB.getTerminator();
-            TransitiveClosureBB[&BB] = std::set<BasicBlock*>();
-            for (unsigned int i = 0;i < TI->getNumSuccessors();++ i)
-                TransitiveClosureBB[&BB].insert(TI->getSuccessor(i));
+            auto i = ID.lookup(&BB);
+
+            for (unsigned int k = 0, e = TI->getNumSuccessors();k < e;++ k){
+                BasicBlock *Succ = TI->getSuccessor(k);
+                auto j = ID.lookup(Succ);
+                TransitiveClosureBB[i][j] = true;
+            }
         }
 
+
         for (BasicBlock &BBk : F) {
+            auto k = ID.lookup(&BBk);
             for (BasicBlock &BBi : F) {
+                auto i = ID.lookup(&BBi);
                 for (BasicBlock &BBj : F) {
-                    if (TransitiveClosureBB[&BBi].count(&BBk) && TransitiveClosureBB[&BBk].count(&BBj)){
-                        // BBi -> BBk && BBk -> BBj
-                        TransitiveClosureBB[&BBi].insert(&BBj);
+                    auto j = ID.lookup(&BBj);
+                    if (TransitiveClosureBB[i][k] && TransitiveClosureBB[k][j]){
+                        TransitiveClosureBB[i][j] = true;
                     }
                 }
             }
         }
 
-        return TransitiveClosureBB;
+#if (PATH_SENS_VERBOSE_LEVEL > 1)
+//    for (BasicBlock &BB : F)
+//    {
+//        auto i = ID.lookup(&BB);
+//        errs() << BB.getName() << " : ";
+//        for (BasicBlock &BBPrime : F)
+//        {
+//            auto j = ID.lookup(&BBPrime);
+//            if (TransitiveClosureBB[i][j])
+//                errs() << BBPrime.getName() << " ";
+//        }
+//        errs() << "\n";
+//    }
+#endif
+        //return TransitiveClosureBB;
+    }
+    void BuildBasicBlockId(Function& F, DenseMap<BasicBlock*, int>& ID){
+        int id = 0;
+        for (BasicBlock &BB: F){
+            ID[&BB] = id ++;
+        }
+#if PATH_SENS_VERBOSE_LEVEL > 1
+//    for (const auto& p: ID){
+//            errs() << p.first->getName() << " : " << p.second << "\n";
+//        }
+#endif
     }
 
     void TryToAddDestructiveMerge(std::vector<double>& BestFitness,
@@ -101,69 +147,108 @@ namespace {
         if (DestructiveMerges.size() == 0){
             DestructiveMerges.emplace_back(PHI);
             BestFitness.front() = MyFitness;
-            RoI.front() = MyRoI;
-        } else if (DestructiveMerges.size() == 0){
+            RoI.front().clear();// delete
+            RoI.front().insert(MyRoI.begin(), MyRoI.end());
+        } else if (DestructiveMerges.size() == 1){
             if (MyFitness > BestFitness.front()){
                 DestructiveMerges.insert(DestructiveMerges.begin(), PHI);
                 BestFitness.back() = BestFitness.front();
                 BestFitness.front() = MyFitness;
-                RoI.back() = RoI.front();
-                RoI.front() = MyRoI;
+                RoI.back().clear();
+                RoI.back().insert(RoI.front().begin(), RoI.front().end());
+                RoI.front().clear();
+                RoI.front().insert(MyRoI.begin(), MyRoI.end());
             } else {
                 DestructiveMerges.emplace_back(PHI);
                 BestFitness.back() = MyFitness;
-                RoI.back() = MyRoI;
+                RoI.back().clear();
+                RoI.back().insert(MyRoI.begin(), MyRoI.end());
             }
         } else {
             if (MyFitness > BestFitness.front()) {
+                DestructiveMerges.front() = PHI;
                 BestFitness.front() = MyFitness;
-                RoI.front() = MyRoI;
+                RoI.front().clear();// delete
+                RoI.front().insert(MyRoI.begin(), MyRoI.end());
             } else {
+                DestructiveMerges.back() = PHI;
                 BestFitness.back() = MyFitness;
-                RoI.back() = MyRoI;
+                RoI.back().clear();
+                RoI.back().insert(MyRoI.begin(), MyRoI.end());
             }
         }
     }
     void GetRoISmall(PHINode *PHI,
-                const std::set<Instruction*>& InfluencedNodes,
-                const std::unordered_map<BasicBlock*, std::set<BasicBlock*> >& TCBB,
+                 const std::set<Instruction*>& InfluencedNodes,
+                 Function& F,
+                 const DenseMap<BasicBlock*, int>& ID,
+                 const std::vector<std::vector<bool> >& Reachable,
                 std::vector<double>& BestFitness,
                 std::vector<std::set<Instruction*> >& RoI,
                 std::vector<PHINode*>& DestructiveMerges){
 
         std::set<Instruction*> MyRoI;
-        BasicBlock* BBPHI = PHI->getParent();
+        BasicBlock* MBB = PHI->getParent();
+        auto m = ID.lookup(MBB); //
 
-        for (Instruction* U_INFL: InfluencedNodes){
-            for(BasicBlock* REACH_BB_PHI: TCBB.at(BBPHI)){
-                if (TCBB.at(REACH_BB_PHI).count(U_INFL->getParent()))
+//        errs() << InfluencedNodes.size() << "\n";
+
+        for (Instruction* UNode : InfluencedNodes){
+            BasicBlock* UBB = UNode->getParent();
+            auto u = ID.lookup(UBB);
+            for(BasicBlock& NBB : F){
+                auto n = ID.lookup(&NBB);
+                if (!Reachable[m][n] && m != n) continue;
+                if (Reachable[n][u] || n == u)
                 {
-                    if (MyRoI.count(&REACH_BB_PHI->front()))
+                    Instruction* InstPtr = &(NBB.front());
+                    if (m == n) InstPtr = PHI->getNextNode();
+                    if (MyRoI.count(InstPtr) == 0 || MyRoI.count(&(NBB.back())) == 0)
                     {
-                        Instruction* InstPtr = &REACH_BB_PHI->front();
-                        while (!InstPtr)
+                        while (InstPtr != nullptr ){
                             MyRoI.insert(InstPtr);
-
-                        if (DestructiveMerges.size() == 2 &&
-                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
-                            return;
+                            if (InstPtr == UNode) break;// no need to go further
+#if PATH_SENS_VERBOSE_LEVEL == 0
+                            if (DestructiveMerges.size() == 2 &&
+                                InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
+                            {
+                                errs() << "----------------------------------------------\n";
+                                errs() << toString(PHI) << " : \n";
+                                errs() << "\tInfluenced Nodes : \n";
+                                for (const auto& Inf: InfluencedNodes)
+                                    errs() << "\t\t" << toString(Inf) << "\n";
+                                errs() << "\tRoI : \n";
+                                for (const auto& Inst: MyRoI)
+                                    errs() << "\t\t" << toString(Inst) << "\n";
+                                errs() << "\n\n";
+                                return;
+                            }
+#endif
+                            InstPtr = InstPtr->getNextNode();
                         }
                     }
                 }
             }
-            BasicBlock *UBB = U_INFL->getParent();
-            if (UBB == BBPHI || TCBB.at(BBPHI).count(UBB)){
-                Instruction* InstPtr = PHI->getNextNode();
-                do{
-                    if (!InstPtr) {
-                        MyRoI.insert(InstPtr);
-                        if (DestructiveMerges.size() == 2 &&
-                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
-                            return;
-                    }
-                } while (!InstPtr || InstPtr != U_INFL);
-            }
+
         }
+
+        errs() << "----------------------------------------------\n";
+        errs() << toString(PHI) << " : \n";
+        errs() << "\tInfluenced Nodes : \n";
+        for (const auto& Inf: InfluencedNodes)
+            errs() << "\t\t" << toString(Inf) << "\n";
+        errs() << "\tRoI : \n";
+        for (const auto& Inst: MyRoI)
+            errs() << "\t\t" << toString(Inst) << "\n";
+        errs() << "\n\n";
+
+#if PATH_SENS_VERBOSE_LEVEL > 0
+        if (DestructiveMerges.size() == 2 &&
+            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
+        {
+            return;
+        }
+#endif
         double MyFitness = InfluencedNodes.size() * 1.0 / MyRoI.size();
         TryToAddDestructiveMerge(BestFitness, RoI, DestructiveMerges, PHI, MyFitness, MyRoI);
     }
@@ -185,11 +270,14 @@ namespace {
                 if (isPotentiallyReachable(BBPHI, B, DT, LI) &&
                         isPotentiallyReachable(B, U_INFL->getParent(), DT, LI))
                 {
-                    if (MyRoI.count(&B->front()))
+                    if (MyRoI.count(&B->front()) == 0)
                     {
                         Instruction* InstPtr = &B->front();
-                        while (!InstPtr)
+                        while (InstPtr != nullptr)
+                        {
                             MyRoI.insert(InstPtr);
+                            InstPtr = InstPtr->getNextNode();
+                        }
 
                         if (DestructiveMerges.size() == 2 &&
                             InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
@@ -202,13 +290,14 @@ namespace {
             if (UBB == BBPHI || isPotentiallyReachable(BBPHI, UBB, DT, LI)){
                 Instruction* InstPtr = PHI->getNextNode();
                 do{
-                    if (!InstPtr) {
+                    if (InstPtr != nullptr) {
                         MyRoI.insert(InstPtr);
                         if (DestructiveMerges.size() == 2 &&
                             InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
                             return;
+                        InstPtr = InstPtr->getNextNode();
                     }
-                } while (!InstPtr || InstPtr != U_INFL);
+                } while (!(InstPtr == nullptr || InstPtr == U_INFL));
             }
         }
         double MyFitness = InfluencedNodes.size() * 1.0 / MyRoI.size();
@@ -232,13 +321,16 @@ namespace {
             const LoopInfo *LI =
                     &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
 
+            //DenseMap<PHINode*, int> DestructiveMergeID;
             std::unordered_map<PHINode*, std::set<Instruction*> > InfluencedNodes;
+            //std::vector<std::set<Instruction*> > InfluencedNodes;
             std::vector<std::set<Instruction*> > RoI(2);
             std::vector<double> BestFitness(2, 0);
             std::vector<PHINode*> DestructiveMerges;
+            DenseMap<BasicBlock*, int> ID;
+            BuildBasicBlockId(F, ID);
 
             SCCPSolver Solver(DL, TLI);
-
             // Mark the first block of the function as being executable.
             Solver.MarkBlockExecutable(&F.front());
 
@@ -254,9 +346,18 @@ namespace {
                 ResolvedUndefs = Solver.ResolvedUndefsIn(F);
             }
 
-            std::unordered_map<BasicBlock*, std::set<BasicBlock *> > TCBB;
+            std::vector<std::vector<bool> > Reachable;
+
             if (F.size() <= 64){
-                TCBB = GetReachableNodes(F);
+                Reachable.resize(F.size());
+                // allocate space
+                for(auto& v: Reachable){v.resize(F.size());}
+                // initialize
+                std::for_each(Reachable.begin(), Reachable.end(),
+                    [](std::vector<bool>& v){
+                    std::fill(v.begin(), v.end(), false);
+                });
+                GetReachableNodes(F, ID, Reachable);
             }
 
 
@@ -271,22 +372,19 @@ namespace {
                         continue;
                     if (auto* PHI = dyn_cast<PHINode>(Inst)){
                         if (Solver.isDestructiveMerge(PHI)){
-                            errs() << toString(PHI)
-                                   << " is a destructive merge.\n"
-                                   << "its influence is ";
                             for (auto UI = PHI->user_begin(), UE = PHI->user_end();UI != UE;){
                                 User *U = *UI++;
                                 if (Instruction *I = dyn_cast<Instruction>(U)) {
-                                    if (!InfluencedNodes.count(PHI)) {
-                                        InfluencedNodes[PHI] = std::set<Instruction*>();
+                                    if (InfluencedNodes.count(PHI) == 0) {
+                                        InfluencedNodes.insert({PHI, std::set<Instruction*>()});
                                     }
                                     InfluencedNodes[PHI].insert(I);
-                                    errs() << toString(I) << "\n";
                                 }
                             }
-                            errs() << "--------------------------------------------\n";
 
-                            if (F.size() <= 64) GetRoISmall(PHI, InfluencedNodes.at(PHI), TCBB, BestFitness, RoI, DestructiveMerges);
+                            if (F.size() <= 64) GetRoISmall(PHI, InfluencedNodes.at(PHI),
+                                                            F, ID, Reachable, BestFitness,
+                                                            RoI, DestructiveMerges);
                             else GetRoILarge(
                                     PHI, InfluencedNodes.at(PHI), F, DT, LI,
                                     BestFitness, RoI, DestructiveMerges
@@ -299,13 +397,14 @@ namespace {
 
 #if (PATH_SENS_VERBOSE_LEVEL > 0)
         int i = 0;
+            errs() << "\n======================================================\n";
         for (const auto& D: DestructiveMerges){
-                errs() << "Destructive merge: " << toString(D) << "\n";
-                errs() << "\tInfluenced nodes of it:\n";
+                errs() << "Destructive Merge : " << toString(D) << "\n";
+                errs() << "\tInfluenced Nodes :\n";
                 for (const auto& I: InfluencedNodes.at(D))
                     errs() << "\t\t" << toString(I) << "\n";
 
-                errs() << "\tRegion of influence of it:\n";
+                errs() << "\tRegion of Influence :\n";
                 for (const auto& R: RoI[i]){
                     errs() << "\t\t" << toString(R) << "\n";
                 }
