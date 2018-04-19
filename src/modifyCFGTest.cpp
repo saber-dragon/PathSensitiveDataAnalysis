@@ -124,6 +124,16 @@ namespace  {
             oldPN->eraseFromParent();
             // Add a predecessor
             NewPN->addIncoming(V1, Pre1);
+
+            // Note that we need also handle values in successors (not in this example, but Target is
+            // the last one)
+            for (BasicBlock::iterator BI = TargetBlock->begin(), E = TargetBlock->end(); BI != E;) {
+                Instruction *Inst = &*BI++;
+                if (Value* V = dyn_cast<Value>(Inst)){
+                    replaceAllUsesOfWithIn(V, VMap[V], NewBB);
+                }
+            }
+
             // The following line is for debug purpose
             PrintBB(NewBB);
 
@@ -131,6 +141,7 @@ namespace  {
             // basic block (i.e., @TargetBlock). However, it seems easier
             // to clone a new one and then remove the old new.
 
+            VMap.clear();
             BasicBlock *NewBB2 = CloneBasicBlock(TargetBlock, VMap,
                                                 ".p2", TargetBlock->getParent());
             TI2->replaceUsesOfWith(TargetBlock, NewBB2);
@@ -141,6 +152,14 @@ namespace  {
             replaceAllUsesOfWithIn(PHI, NewPN2, NewBB2);
             OldPN2->eraseFromParent();
             NewPN2->addIncoming(V2, Pre2);
+
+
+            for (BasicBlock::iterator BI = TargetBlock->begin(), E = TargetBlock->end(); BI != E;) {
+                Instruction *Inst = &*BI++;
+                if (Value* V = dyn_cast<Value>(Inst)){
+                    replaceAllUsesOfWithIn(V, VMap[V], NewBB2);
+                }
+            }
 
             // The following line is for debug purpose
             PrintBB(NewBB2);

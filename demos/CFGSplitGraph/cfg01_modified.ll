@@ -20,11 +20,17 @@ if.else:                                          ; preds = %entry
 
 if.end.p1:                                        ; preds = %if.then
   %y.0.p11 = phi i32 [ 10, %if.then ]
-  ret i32 %y.0.p11
+  %z.p1 = add nsw i32 %y.0.p11, %a
+  %w.p1 = add nsw i32 %y.0.p11, %add1
+  %r.p1 = add nsw i32 %z.p1, %w.p1
+  ret i32 %r.p1
 
 if.end.p2:                                        ; preds = %if.else
   %y.0.p22 = phi i32 [ 0, %if.else ]
-  ret i32 %y.0.p22
+  %z.p2 = add nsw i32 %y.0.p22, %a
+  %w.p2 = add nsw i32 %y.0.p22, %add1
+  %r.p2 = add nsw i32 %z.p2, %w.p2
+  ret i32 %r.p2
 }
 
 attributes #0 = { noinline nounwind uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
