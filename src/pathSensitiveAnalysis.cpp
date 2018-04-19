@@ -8,7 +8,9 @@
  * Start Date : 14 Mar 2018
  *
  */
-#include "llvm/Transforms/IPO/SCCP.h"
+//#include "llvm/Transforms/IPO/SCCP.h"
+
+// Useful LLVM data structures
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -17,14 +19,19 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/GraphTraits.h"  // for GraphTraits
+
+
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/CFG.h"//
+#include "llvm/Analysis/LoopInfo.h"
 //#include "llvm/Analysis/Utils/Local.h"
 //#include "llvm/Analysis/ValueLattice.h"
 //#include "llvm/Analysis/ValueLatticeUtils.h"
 
-#include "llvm/ADT/GraphTraits.h"  // for GraphTraits
+
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"  // TerminatorInst
 #include "llvm/IR/InstIterator.h"
@@ -32,53 +39,30 @@
 #include "llvm/IR/Module.h"  // for ModulePass
 #include "llvm/IR/User.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IR/Dominators.h"
+#include "llvm/IR/CFG.h"
+#include "llvm/IR/BasicBlock.h"
+
 #include "llvm/Pass.h"
-#include "llvm/Support/Format.h"  // for format()
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Analysis/ConstantFolding.h"
+//#include "llvm/Transforms/Scalar.h"
+//#include "llvm/Analysis/ConstantFolding.h"
 //#include "llvm/Analysis/TargetLibraryInfo.h"
 
-#include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Scalar/SCCP.h"
-
-#include "llvm/IR/CFG.h"
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/Analysis/CFG.h"//
-
+//#include "llvm/Transforms/IPO.h"
+//#include "llvm/Transforms/Scalar.h"
+//#include "llvm/Transforms/Scalar/SCCP.h"
 #include <set>
 #include <unordered_map>
 #include "PathSensitiveAnalysisConfig.h"
 
 #include "SCCP.hpp"
+#include "Utils.hpp"
 
 using namespace llvm;
+using namespace saber;
 
 namespace {
-
-    template <typename Type>
-    std::string toString(const Type* val) {
-        std::string vStr;
-        raw_string_ostream os(vStr);
-        val->print(os);
-
-        return vStr;
-    }
-
-    template <>
-    std::string toString(const Instruction* val) {
-        std::string vStr;
-        raw_string_ostream os(vStr);
-        val->print(os);
-        return (vStr + " (BasicBlock: " + val->getParent()->getName().str() + ")");
-    }
-
-    template <>
-    std::string toString(const PHINode* val) {
-        return toString(dyn_cast<Instruction>(val));
-    }
 
     void GetReachableNodes(Function &F,
                            const DenseMap<BasicBlock*, int>& ID,
@@ -178,6 +162,33 @@ namespace {
             }
         }
     }
+
+//    bool CloneInstTest(Instruction* Inst){
+//        if (Inst == nullptr) return false; //
+//        BasicBlock *Pb = Inst->getParent();
+//        auto *newInst = Inst->clone();
+//        Pb->getInstList().insert(Inst, newInst);
+//        return true;
+//    }
+//
+//    bool SplitBasicBlock(BasicBlock* B, Instruction* Inst){
+//        static LLVMContext TheContext;
+//        BasicBlock* NewBlock = BasicBlock::Create(TheContext, "Test", B->getParent(), B);
+//        Instruction *InstPtr = &(B->front());
+//        // copy inst to new basic block
+//        while (InstPtr != Inst){
+//            NewBlock->getInstList().push_back(InstPtr);
+//            InstPtr = InstPtr->getNextNode();
+//        }
+//        InstPtr = &(B->front());
+//        Instruction *InstPtrNext;
+//        // remove inst from old basic block
+//        while (InstPtr != Inst){
+//            InstPtrNext = InstPtr->getNextNode();
+//            InstPtr->eraseFromParent();
+//            InstPtr = InstPtrNext;
+//        }
+//    }
     void GetRoISmall(PHINode *PHI,
                  const std::set<Instruction*>& InfluencedNodes,
                  Function& F,
@@ -191,11 +202,12 @@ namespace {
         BasicBlock* MBB = PHI->getParent();
         auto m = ID.lookup(MBB); //
 
-//        errs() << InfluencedNodes.size() << "\n";
-
+        // for each u in influenced_nodes(m)
         for (Instruction* UNode : InfluencedNodes){
             BasicBlock* UBB = UNode->getParent();
+            // get the id of the Basic Block
             auto u = ID.lookup(UBB);
+            // for each n in reachable_nodes(m)
             for(BasicBlock& NBB : F){
                 auto n = ID.lookup(&NBB);
                 if (!Reachable[m][n] && m != n) continue;
@@ -212,7 +224,7 @@ namespace {
                             if (DestructiveMerges.size() == 2 &&
                                 InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
                             {
-                                errs() << "----------------------------------------------\n";
+                                errs() << "------------------------------------------------------------------------------\n";
                                 errs() << toString(PHI) << " : \n";
                                 errs() << "\tInfluenced Nodes : \n";
                                 for (const auto& Inf: InfluencedNodes)
@@ -232,7 +244,7 @@ namespace {
 
         }
 
-        errs() << "----------------------------------------------\n";
+        errs() << "------------------------------------------------------------------------------\n";
         errs() << toString(PHI) << " : \n";
         errs() << "\tInfluenced Nodes : \n";
         for (const auto& Inf: InfluencedNodes)
@@ -252,6 +264,7 @@ namespace {
         double MyFitness = InfluencedNodes.size() * 1.0 / MyRoI.size();
         TryToAddDestructiveMerge(BestFitness, RoI, DestructiveMerges, PHI, MyFitness, MyRoI);
     }
+
     void GetRoILarge(PHINode *PHI,
                      const std::set<Instruction*>& InfluencedNodes,
                      Function& F,
@@ -262,42 +275,30 @@ namespace {
                      std::vector<PHINode*>& DestructiveMerges){
 
         std::set<Instruction*> MyRoI;
-        BasicBlock* BBPHI = PHI->getParent();
+        BasicBlock* MBB = PHI->getParent();
 
-        for (Instruction* U_INFL: InfluencedNodes){
-            for (BasicBlock& BB: F){
-                BasicBlock *B = &BB;
-                if (isPotentiallyReachable(BBPHI, B, DT, LI) &&
-                        isPotentiallyReachable(B, U_INFL->getParent(), DT, LI))
+        for (Instruction* UNode: InfluencedNodes){
+            BasicBlock *UBB = UNode->getParent();
+            for (BasicBlock& NB: F){
+                BasicBlock *NBB = &NB;
+                if (!isPotentiallyReachable(MBB, NBB, DT, LI) && MBB != NBB) continue;
+                if (isPotentiallyReachable(NBB, UBB, DT, LI) || NBB == UBB)
                 {
-                    if (MyRoI.count(&B->front()) == 0)
-                    {
-                        Instruction* InstPtr = &B->front();
-                        while (InstPtr != nullptr)
-                        {
+                    if (MyRoI.count(&(NBB->front())) == 0 && MyRoI.count(&(NBB->back())) == 0) {
+                        Instruction* InstPtr = &NBB->front();
+                        if (MBB == NBB) InstPtr = PHI->getNextNode();
+                        while (InstPtr != nullptr) {
                             MyRoI.insert(InstPtr);
+                            // The following line might be optimized
+                            if (DestructiveMerges.size() == 2 &&
+                                InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
+                                return;
+                            }
+                            if (InstPtr == UNode) break;
                             InstPtr = InstPtr->getNextNode();
-                        }
-
-                        if (DestructiveMerges.size() == 2 &&
-                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back()) {
-                            return;
                         }
                     }
                 }
-            }
-            BasicBlock *UBB = U_INFL->getParent();
-            if (UBB == BBPHI || isPotentiallyReachable(BBPHI, UBB, DT, LI)){
-                Instruction* InstPtr = PHI->getNextNode();
-                do{
-                    if (InstPtr != nullptr) {
-                        MyRoI.insert(InstPtr);
-                        if (DestructiveMerges.size() == 2 &&
-                            InfluencedNodes.size() * 1.0 / MyRoI.size() <= BestFitness.back())
-                            return;
-                        InstPtr = InstPtr->getNextNode();
-                    }
-                } while (!(InstPtr == nullptr || InstPtr == U_INFL));
             }
         }
         double MyFitness = InfluencedNodes.size() * 1.0 / MyRoI.size();
@@ -397,7 +398,7 @@ namespace {
 
 #if (PATH_SENS_VERBOSE_LEVEL > 0)
         int i = 0;
-            errs() << "\n======================================================\n";
+            errs() << "\n==============================================================================\n";
         for (const auto& D: DestructiveMerges){
                 errs() << "Destructive Merge : " << toString(D) << "\n";
                 errs() << "\tInfluenced Nodes :\n";

@@ -100,13 +100,20 @@ message(STATUS "Get the following test files: ${test_filenames}")
 # copy benchmark to build
 file(COPY "${PROJECT_SOURCE_DIR}/benchmarks" DESTINATION "${PROJECT_BINARY_DIR}")
 file(COPY "${PROJECT_SOURCE_DIR}/scripts" DESTINATION "${PROJECT_BINARY_DIR}")
-file(GLOB HEADERS "*.hpp" "*.h" "${PROJECT_SOURCE_DIR}/dependencies/*.hpp")
+file(GLOB HEADERS
+        "*.hpp"
+        "*.h"
+        "${PROJECT_SOURCE_DIR}/dependencies/*.hpp"
+        "${PROJECT_SOURCE_DIR}/utils/*.hpp")
 
 
 
 set(VERBOSE_LEVEL 2)
 
-include_directories("${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/dependencies")
+include_directories("${PROJECT_SOURCE_DIR}"
+        "${PROJECT_BINARY_DIR}"
+        "${PROJECT_SOURCE_DIR}/dependencies"
+        "${PROJECT_SOURCE_DIR}/utils")
 #
 set(src "${PROJECT_SOURCE_DIR}/src/pathSensitiveAnalysis.cpp")
 get_filename_component(src_we ${src} NAME_WE)
@@ -120,6 +127,19 @@ configure_file(
 add_library(${libname} SHARED ${HEADERS} ${src})
 add_llvm_pass_tests("$<TARGET_FILE:${libname}>" "${libname}" "${test_filenames}")
 
+# CFG Test
+#
+set(src "${PROJECT_SOURCE_DIR}/src/modifyCFGTest.cpp")
+get_filename_component(src_we ${src} NAME_WE)
+set(PASS_NAME "${src_we}")
+set(libname "${src_we}")
+message(STATUS "adding a library for ${src} named ${libname}")
+configure_file(
+        "${PROJECT_SOURCE_DIR}/configs/PathSensitiveAnalysis.h.in"
+        "${PROJECT_BINARY_DIR}/PathSensitiveAnalysisConfig.h"
+)
+add_library(${libname} SHARED ${HEADERS} ${src})
+add_llvm_pass_tests("$<TARGET_FILE:${libname}>" "${libname}" "${test_filenames}")
 
 
 
