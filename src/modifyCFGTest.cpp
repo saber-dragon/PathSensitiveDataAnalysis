@@ -52,7 +52,29 @@ using namespace llvm;
 using namespace saber;
 
 namespace  {
+    class BasicBlockHepler {
+    public:
 
+        static void HandleDestructiveMerge(PHINode *DM,
+                                           const Twine &NameSuffix = "",
+                                           std::vector<size_t>& RevivalIncomings,
+                                           ValueToValueMapTy& VMap){
+            BasicBlock *TargetBlock = DM->getParent();
+            Function *Func = TargetBlock->getParent();
+            auto Ty = DM->getType();
+            auto OldDMName = DM->getName();
+            BasicBlock *NewBB = CloneBasicBlock(TargetBlock,
+                                                VMap,
+                                                NameSuffix,
+                                                Func);
+            PHINode *OldPN = dyn_cast<PHINode>(NewBB->begin());
+            PHINode *NewPN = PHINode::Create(Ty, static_cast<unsigned int>(RevivalIncomings.size()), OldDMName + NameSuffix, OldPN);
+
+
+
+        }
+        
+    };
     struct ModifyCFG : FunctionPass {
         static char ID;
 
