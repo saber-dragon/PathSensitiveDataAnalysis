@@ -45,13 +45,185 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+
+#include <queue>
+
 #include "PathSensitiveAnalysisConfig.h"
 #include "Utils.hpp"
 
 using namespace llvm;
 using namespace saber;
 
-namespace  {
+namespace {
+    using BasicBlockToBasicBlockMapTy = DenseMap<BasicBlock *, BasicBlock *>;
+    using Edge = std::pair<Instruction *, Instruction *>;
+    using EqClass = int16_t;
+
+    class BasicBlockHepler {
+        static const EqClass CZero = -1;
+    public:
+        static void HandleRegion(std::set<BasicBlock *> &Region,
+                                 const std::set<Edge> &InEdges,
+                                 const std::set<Edge> &OutEdges,
+                                 const DenseMap<Edge, EqClass> &RMap,
+                                 const unsigned NumOfClasses,
+                                 const DenseMap<Edge, std::set<Value *> > &RDMap) {
+            EqClass s = CZero;
+            std::vector<ValueToValueMapTy> VMapVec(NumOfClasses);
+            std::vector<BasicBlockToBasicBlockMapTy> BBMapVec(NumOfClasses);
+            std::vector<Instruction *> DeadInst;
+            DenseSet<std::pair<BasicBlock *, EqClass>> Copied;
+            DenseSet<std::pair<Edge, EqClass>> Visited;
+
+            std::queue<Edge> Queue;
+
+            // Push in queue all the in edges
+            for (auto &InEdge : InEdges) {
+                Queue.push(InEdge);
+            }
+            // traverse each edge
+            while (!Queue.empty()) {
+                auto CurEdge = Queue.front();
+                Queue.pop();
+                if (OutEdges.count(CurEdge)) {// kill edge
+                    s = CZero;
+                    if (!Visited.count({CurEdge, s})) {
+                        HandleKillEdge(CurEdge, RDMap.lookup(CurEdge));
+                    }
+                    else {
+                        Visited.insert({CurEdge, s});
+                    }
+                    continue;
+                }
+
+                if (RMap.count(CurEdge)) {// revival edge
+                    s = RMap.lookup(CurEdge);
+                    assert(s + 1 < NumOfClasses);
+                }
+                BasicBlock *Predecessor = CurEdge.first->getParent();
+                BasicBlock *TargetBlock = CurEdge.second->getParent();
+                assert(Region.count(TargetBlock));
+                std::string NameSuffix("p" + std::to_string(s + 1));
+                if (Copied.count({TargetBlock, s})) {
+                    HandleCopiedBasicBlock(TargetBlock,
+                                           NameSuffix,
+                                           Predecessor,
+                                           VMapVec[s + 1],
+                                           BBMapVec[s + 1],
+                                           DeadInst);
+                }
+                else {
+                    HandleBasicBlock(TargetBlock,
+                                     NameSuffix,
+                                     Predecessor,
+                                     VMapVec[s + 1],
+                                     BBMapVec[s + 1],
+                                     DeadInst);
+                    Copied.insert({TargetBlock, s});
+                }
+                Visited.insert({CurEdge, s});
+                auto *TI = dyn_cast<TerminatorInst>(CurEdge.second);
+                for (unsigned i = 0;i < TI->getNumSuccessors();++ i){
+                    BasicBlock *Pre = TI->getSuccessor(i);
+                    Edge NextEdge = std::make_pair(CurEdge.second, &(Pre->front()));
+                    if (!Visited.count({NextEdge, s})) Queue.push(NextEdge);
+                }
+            }
+
+
+        }
+
+        static void HandleKillEdge(Edge &KillEdge, const std::set<Value *> &ReachingDefinitions) {
+
+        }
+
+        static void HandleCopiedBasicBlock(BasicBlock *TargetBlock,
+                                           const Twine &NameSuffix = "",
+                                           BasicBlock *&Predecessor,
+                                           ValueToValueMapTy &VMap,
+                                           BasicBlockToBasicBlockMapTy &BBMap,
+                                           std::vector<Instruction *> &DeadInst) {
+
+        }
+
+        static void HandleBasicBlock(BasicBlock *TargetBlock,
+                                     const Twine &NameSuffix = "",
+                                     BasicBlock *&Predecessor,
+                                     ValueToValueMapTy &VMap,
+                                     BasicBlockToBasicBlockMapTy &BBMap,
+                                     std::vector<Instruction *> &DeadInst) {
+            Function *Func = TargetBlock->getParent();
+            // clone the target basic block
+            BasicBlock *NewBB = CloneBasicBlock(TargetBlock,
+                                                VMap,
+                                                NameSuffix,
+                                                Func);
+            // add it to BasicBlock Map
+            BBMap[TargetBlock] = NewBB;
+
+            // Process Instruction one by one
+            BasicBlock::iterator NewBI = NewBB->begin();
+            // (Value, BasicBlock) pair for each PHI Node
+            std::vector<std::vector<std::pair<Value *, BasicBlock *> > > KeepIncoming;
+            // all PHI Node in the basic block
+            std::vector<std::pair<PHINode *, PHINode *> > PNs;
+            for (BasicBlock::iterator BI = TargetBlock->begin(), E = TargetBlock->end(); BI != E;) {
+                Instruction *Inst = &*BI++;
+                Instruction *NewInst = &*NewBI++;
+
+                if (auto *PN = dyn_cast<PHINode>(Inst)) {// is a PHI Node
+                    auto *PNInNewBB = dyn_cast<PHINode>(NewInst);
+                    PNs.emplace_back(PN, PNInNewBB);
+                    KeepIncoming.emplace_back(std::vector<std::pair<Value *, BasicBlock *> >());
+                    for (unsigned k = 0; k < PN->getNumIncomingValues(); ++k) {
+                        if (Predecessor == PN->getIncomingBlock(k)) {//
+                            KeepIncoming.back().emplace_back(get(VMap, PN->getIncomingValue(k)),
+                                                             get(BBMap, PN->getIncomingBlock(k)));
+                        }
+                    }
+                } else if (!PNs.empty()) {// Here we assume that PHI nodes are all at the beginning of a Basic block
+                    for (size_t i = 0; i < PNs.size(); ++i) {
+                        auto OrgN = PNs[i].first;
+                        auto OldN = PNs[i].second;
+                        auto NewN = HandlePHINode(OldN,
+                                                  NameSuffix,
+                                                  KeepIncoming[i],
+                                                  DeadInst);
+                        VMap[OrgN] = NewN;// Update @VMap
+                    }
+
+                    break; // jump out the loop
+                }
+            }
+
+
+        }
+
+        // Note that this function only handles the predecessors of a PHI Node
+        static PHINode *HandlePHINode(PHINode *PN,
+                                      const Twine &NameSuffix = "",
+                                      const std::vector<std::pair<Value *, BasicBlock *> > &RevivalIncoming,
+                                      std::vector<Instruction *> &DeadInst) {
+            BasicBlock *BB = PN->getParent();
+            auto Ty = PN->getType();
+            auto NewPHIName = PN->getName() + NameSuffix;
+            // Insert a new PHI Node before @PN
+            PHINode *NewPN = PHINode::Create(Ty, static_cast<unsigned int>(RevivalIncoming.size()), NewPHIName, PN);
+            // might not be necessary
+            replaceAllUsesOfWithIn(PN, NewPN, BB);// PS: replaceAllUsesWith might work
+            //
+            for (auto VBPair: RevivalIncoming) {
+                NewPN->addIncoming(VBPair.first, VBPair.second);
+            }
+            // Add @PN to DeadInst
+            // Note that we can not remove @PN here, because other instructions
+            // might use the value defined by it.
+            DeadInst.push_back(PN);
+            // return the new PHI Node so that we can fix the value map for it
+            return NewPN;
+        }
+
+    };
 
     struct ModifyCFG : FunctionPass {
         static char ID;
@@ -66,16 +238,17 @@ namespace  {
 //            AU.addRequired<LoopInfoWrapperPass>();
         }
     };
+
     char ModifyCFG::ID = 0;
 
     bool ModifyCFG::runOnFunction(Function &F) {
         bool Change = false;
         Instruction *SplitInst = nullptr;
         BasicBlock *TargetBlock = nullptr;
-        for ( BasicBlock &BB: F){
+        for (BasicBlock &BB: F) {
             for (BasicBlock::iterator BI = BB.begin(), E = BB.end(); BI != E;) {
                 Instruction *Inst = &*BI++;
-                if ( PHINode* PHI = dyn_cast<PHINode>(Inst) ){
+                if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
                     TargetBlock = &BB;
                     SplitInst = Inst;
                     break;
@@ -102,7 +275,7 @@ namespace  {
             // Clone the basic block
             ValueToValueMapTy VMap;
             BasicBlock *NewBB = CloneBasicBlock(TargetBlock, VMap,
-                    ".p1", TargetBlock->getParent());
+                                                ".p1", TargetBlock->getParent());
 
             // make the first predecessor of @PHI points to the new basic block
             TI->replaceUsesOfWith(TargetBlock, NewBB);
@@ -129,7 +302,7 @@ namespace  {
             // the last one)
             for (BasicBlock::iterator BI = TargetBlock->begin(), E = TargetBlock->end(); BI != E;) {
                 Instruction *Inst = &*BI++;
-                if (Value* V = dyn_cast<Value>(Inst)){
+                if (Value *V = dyn_cast<Value>(Inst)) {
                     replaceAllUsesOfWithIn(V, VMap[V], NewBB);
                 }
             }
@@ -143,7 +316,7 @@ namespace  {
 
             VMap.clear();
             BasicBlock *NewBB2 = CloneBasicBlock(TargetBlock, VMap,
-                                                ".p2", TargetBlock->getParent());
+                                                 ".p2", TargetBlock->getParent());
             TI2->replaceUsesOfWith(TargetBlock, NewBB2);
             PHINode *OldPN2 = dyn_cast<PHINode>(NewBB2->begin());
             PHINode *NewPN2 = PHINode::Create(Ty, (unsigned) 1, Name + ".p2",
@@ -156,7 +329,7 @@ namespace  {
 
             for (BasicBlock::iterator BI = TargetBlock->begin(), E = TargetBlock->end(); BI != E;) {
                 Instruction *Inst = &*BI++;
-                if (Value* V = dyn_cast<Value>(Inst)){
+                if (Value *V = dyn_cast<Value>(Inst)) {
                     replaceAllUsesOfWithIn(V, VMap[V], NewBB2);
                 }
             }
