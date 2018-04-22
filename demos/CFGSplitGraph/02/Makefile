@@ -1,7 +1,7 @@
 OPT=opt
 RM=rm -rf
-obj=cfg01_modified.png
-src=cfg01_before_modify.ll
+obj=cfg02_modified.png
+src=cfg02_before_modify.ll
 intermediate=cfg01_modified.ll
 byproduct=cfg01_before_modify.png
 
@@ -13,7 +13,7 @@ $(obj): $(intermediate)
 	$(RM) *.dot
 
 $(intermediate): $(src)
-	$(OPT) -S -load ./`ls |grep *.so` -`ls |grep -Po 'lib\K[^.]+'` $< -o $@
+	$(OPT) -S -load ./`ls |grep *.so` -Temp $< -o $@
 
 $(byproduct): $(src)
 	$(OPT) -dot-cfg-only $<
