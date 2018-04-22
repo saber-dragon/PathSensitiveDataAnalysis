@@ -20,8 +20,10 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llvm/Transforms/Utils/ValueMapper.h"
+
 #include <string>
-#include <bits/unordered_map.h>
+//#include <bits/unordered_map.h>
 
 using namespace llvm;
 
@@ -46,12 +48,34 @@ namespace saber{
     std::string toString(const PHINode* val) {
         return toString(dyn_cast<Instruction>(val));
     }
+
+    std::string toString(const std::pair<Instruction*, Instruction*>& Edge){
+        return toString(Edge.first) + " --> " + toString(Edge.second);
+    }
     void replaceAllUsesOfWithIn(Value *I, Value *J, BasicBlock *BB) {
         for (auto UI = I->user_begin(), UE = I->user_end(); UI != UE;) {
             Use &TheUse = UI.getUse();
             ++UI;
             if (auto *II = dyn_cast<Instruction>(TheUse.getUser()))
                 if (BB == II->getParent())
+                    II->replaceUsesOfWith(I, J);
+        }
+    }
+    void replaceAllUsesOfWithIn(Value *I, Value *J, const std::set<BasicBlock *>& BBSet) {
+        for (auto UI = I->user_begin(), UE = I->user_end(); UI != UE;) {
+            Use &TheUse = UI.getUse();
+            ++UI;
+            if (auto *II = dyn_cast<Instruction>(TheUse.getUser()))
+                if (BBSet.count(II->getParent()))
+                    II->replaceUsesOfWith(I, J);
+        }
+    }
+    void replaceAllUsesOfOutside(Value *I, Value *J, const std::set<BasicBlock *>& BBSet) {
+        for (auto UI = I->user_begin(), UE = I->user_end(); UI != UE;) {
+            Use &TheUse = UI.getUse();
+            ++UI;
+            if (auto *II = dyn_cast<Instruction>(TheUse.getUser()))
+                if (!BBSet.count(II->getParent()))
                     II->replaceUsesOfWith(I, J);
         }
     }

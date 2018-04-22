@@ -1,0 +1,18 @@
+digraph "CFG for 'foo' function" {
+	label="CFG for 'foo' function";
+
+	Node0x561241681140 [shape=record,label="{entry:\l  %add = add nsw i32 %a, 10\l  %add1 = add nsw i32 %add, %a\l  %add2 = add nsw i32 %a, %add1\l  %cmp = icmp sgt i32 %add2, 100\l  br i1 %cmp, label %if.then, label %if.else\l|{<s0>T|<s1>F}}"];
+	Node0x561241681140:s0 -> Node0x561241681ae0;
+	Node0x561241681140:s1 -> Node0x561241681b50;
+	Node0x561241681ae0 [shape=record,label="{if.then:                                          \l  br label %if.end.p1\l}"];
+	Node0x561241681ae0 -> Node0x561241681cb0;
+	Node0x561241681b50 [shape=record,label="{if.else:                                          \l  br label %if.end.p2\l}"];
+	Node0x561241681b50 -> Node0x561241681d60;
+	Node0x561241681e40 [shape=record,label="{if.end.split:                                     \l  %.insert = phi i32 [ %r.p1, %if.end.p1 ], [ %r.p2, %if.end.p2 ]\l  br label %exit\l}"];
+	Node0x561241681e40 -> Node0x561241682110;
+	Node0x561241682110 [shape=record,label="{exit:                                             \l  ret i32 %.insert\l}"];
+	Node0x561241681d60 [shape=record,label="{if.end.p2:                                        \l  %y.0.p21 = phi i32 [ 0, %if.else ]\l  %z.p2 = add nsw i32 %y.0.p21, %a\l  %w.p2 = add nsw i32 %y.0.p21, %add1\l  %r.p2 = add nsw i32 %z.p2, %w.p2\l  br label %if.end.split\l}"];
+	Node0x561241681d60 -> Node0x561241681e40;
+	Node0x561241681cb0 [shape=record,label="{if.end.p1:                                        \l  %y.0.p12 = phi i32 [ 10, %if.then ]\l  %z.p1 = add nsw i32 %y.0.p12, %a\l  %w.p1 = add nsw i32 %y.0.p12, %add1\l  %r.p1 = add nsw i32 %z.p1, %w.p1\l  br label %if.end.split\l}"];
+	Node0x561241681cb0 -> Node0x561241681e40;
+}

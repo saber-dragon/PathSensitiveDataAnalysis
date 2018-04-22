@@ -141,6 +141,17 @@ configure_file(
 add_library(${libname} SHARED ${HEADERS} ${src})
 add_llvm_pass_tests("$<TARGET_FILE:${libname}>" "${libname}" "${test_filenames}")
 
-
+# Just Tr Me
+set(src "${PROJECT_SOURCE_DIR}/src/Temp.cpp")
+get_filename_component(src_we ${src} NAME_WE)
+set(PASS_NAME "${src_we}")
+set(libname "${src_we}")
+message(STATUS "adding a library for ${src} named ${libname}")
+configure_file(
+        "${PROJECT_SOURCE_DIR}/configs/PathSensitiveAnalysis.h.in"
+        "${PROJECT_BINARY_DIR}/PathSensitiveAnalysisConfig.h"
+)
+add_library(${libname} SHARED ${HEADERS} ${src})
+add_llvm_pass_tests("$<TARGET_FILE:${libname}>" "${libname}" "${test_filenames}")
 
 
