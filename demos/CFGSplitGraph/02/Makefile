@@ -2,8 +2,8 @@ OPT=opt
 RM=rm -rf
 obj=cfg02_modified.png
 src=cfg02_before_modify.ll
-intermediate=cfg01_modified.ll
-byproduct=cfg01_before_modify.png
+intermediate=cfg02_modified.ll
+byproduct=cfg02_before_modify.png
 
 all: $(obj) $(byproduct)
 
