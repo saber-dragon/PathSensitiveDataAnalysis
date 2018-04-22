@@ -10,6 +10,24 @@ In this project, we (Long, Moses, and Kelsey) implements the path-sensitive data
 
 We did some experiments on some very simple examples. The results can be found at [demos](./demos/README.md).
 
+## Usage
+
+Dependencies:
++ LLVM 4.0.1
++ cmake
+
+### Install Dependencies & Compiler
+
+```bash
+sudo apt-get install llvm-4.0 clang-4.0
+sudo apt-get install cmake
+cd /path/to/the/root/of/this/repo
+mkdir build && cd build
+export CC=/usr/lib/llvm-4.0/bin/clang CXX=/usr/lib/llvm-4.0/bin/clang++
+cmake .. -DLLVM_ROOT_PATH=/usr/lib/llvm-4.0
+make
+```
+
 
 ## Authors
 
