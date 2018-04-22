@@ -1,6 +1,6 @@
 CC=clang
 CXX=clang++
-CXXFLAGS=-S -emit-llvm
+CXXFLAGS=-S -emit-llvm -O0
 RM=rm -rf
 CP=cp -r
 

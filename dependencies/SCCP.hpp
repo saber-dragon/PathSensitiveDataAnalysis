@@ -344,7 +344,7 @@ namespace {
         // check whether @PHI is destructive
         bool isDestructiveMerge(PHINode *PHI);
         // get splits of @PHI
-        std::vector<std::vector<int> > getSplitsOfDestructiveMerge(PHINode* PHI);
+        std::vector<std::vector<unsigned > > getSplitsOfDestructiveMerge(PHINode* PHI);
 
     private:
         // pushToWorkList - Helper for markConstant/markForcedConstant/markOverdefined
@@ -1530,9 +1530,9 @@ bool SCCPSolver::isDestructiveMerge(PHINode *PHI) {
     return false;
 }
 
-std::vector<std::vector<int> > SCCPSolver::getSplitsOfDestructiveMerge(PHINode *PHI) {
-    std::vector<std::vector<int> > Splits;
-    Splits.emplace_back(std::vector<int>());//
+std::vector<std::vector<unsigned > > SCCPSolver::getSplitsOfDestructiveMerge(PHINode *PHI) {
+    std::vector<std::vector<unsigned > > Splits;
+    //Splits.push_back(std::vector<unsigned >());//
     DenseMap<Constant *, int> ConstType;
 
     for (unsigned i = 0, e = PHI->getNumIncomingValues(); i != e; ++i) {
@@ -1543,7 +1543,7 @@ std::vector<std::vector<int> > SCCPSolver::getSplitsOfDestructiveMerge(PHINode *
             Constant * C = IV.getConstant();
             if (! ConstType.count(C)) {
                 ConstType.insert({C, static_cast<const int &>(Splits.size())});
-                Splits.emplace_back(std::vector<int>());
+                Splits.push_back(std::vector<unsigned >());
             }
             Splits[ConstType[C]].emplace_back(i);
         }

@@ -6,19 +6,27 @@
 ### Demo 01 : Single Block (No Successor)
 
 Original CFG:
-![](./01/cfg01_before_modify.png)
+![](./final/demo01.png)
 
 After Modification:
-![](./01/cfg01_modified.png)
+![](./final/demo01_modified.png)
 
 
 ### Demo 02 : Single Block with Single Successors
 
 Original CFG:
-![](./02/cfg02_before_modify.png)
+![](./final/demo02.png)
 
 After Modification:
-![](./02/cfg02_modified.png)
+![](./final/demo02_modified.png)
+
+### Demo 3 : A Region of Blocks
+Original CFG:
+![](./final/demo03.png)
+
+After Modification:
+![](./final/demo03_modified.png)
+
 
 ## Usage
 

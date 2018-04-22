@@ -23,6 +23,7 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
 #include <string>
+#include <vector>
 //#include <bits/unordered_map.h>
 
 using namespace llvm;
@@ -99,6 +100,72 @@ namespace saber{
         return OldValue;
     }
 
+    template <typename T>
+    bool HasIntersection(const std::set<T>& A, const std::set<T>& B){
+        if (A.empty() || B.empty()) return false;
+        for (const auto& e : A){
+            if (B.count(e)) return true;
+        }
+        return false;
+    }
+
+    template <typename T>
+    std::set<T> SetUnion(const std::set<T>& A, const std::set<T>& B){
+        std::set<T> C;
+        C.insert(A.begin(), A.end());
+        C.insert(B.begin(), B.end());
+
+        return C;
+    }
+
+    std::vector<Instruction*> InstSuccessors(Instruction* Inst){
+        std::vector<Instruction*> succ;
+        if (Instruction * S = Inst->getNextNode()){
+            succ.push_back(S);
+        } else {
+            TerminatorInst *TI = dyn_cast<TerminatorInst>(Inst);
+            for (unsigned k = 0;k < TI->getNumSuccessors();++ k){
+                succ.push_back(&(TI->getSuccessor(k)->front()));
+            }
+        }
+        return succ;
+    }
+
+    std::vector<Instruction*> InstPredecessors(Instruction* Inst){
+        std::vector<Instruction*> pred;
+        if (Instruction * S = Inst->getPrevNode()){
+            pred.push_back(S);
+        } else {
+            BasicBlock *BB = Inst->getParent();
+            for (pred_iterator BI = pred_begin(BB), BE = pred_end(BB); BI != BE; ++ BI){
+                BasicBlock *P = *BI;
+                pred.push_back(&(P->back()));
+            }
+        }
+        return pred;
+    }
+    void ReachbyMe(BasicBlock* BB, DenseSet<BasicBlock*>& Visited){
+        if (Visited.count(BB)) return;
+        Visited.insert(BB);
+
+        auto* TI = BB->getTerminator();
+        for (unsigned k = 0;k < TI->getNumSuccessors();++ k){
+            auto* Next = TI->getSuccessor(k);
+            if (!Visited.count(Next)) ReachbyMe(Next, Visited);
+        }
+    }
+
+    void ReachToMe(BasicBlock* BB, DenseSet<BasicBlock*>& Visited){
+        if (Visited.count(BB)) return ;
+
+        Visited.insert(BB);
+
+        for (pred_iterator PI = pred_begin(BB), PE = pred_end(BB);PI != PE;++ PI){
+            BasicBlock *Pre = *PI;
+            if (!Visited.count(Pre)) ReachToMe(Pre, Visited);
+        }
+
+    }
 //    template <typename T>
 //    T get(const std::unordered_map<T, T>& TMap, const T& Key){
 //        if (TMap.count(Key)) return TMap.at(Key);

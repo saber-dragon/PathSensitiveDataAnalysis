@@ -1,0 +1,19 @@
+digraph "CFG for 'foo' function" {
+	label="CFG for 'foo' function";
+
+	Node0x55783a41df50 [shape=record,label="{entry:\l  br label %A\l}"];
+	Node0x55783a41df50 -> Node0x55783a41e000;
+	Node0x55783a41e000 [shape=record,label="{A:                                                \l  %a = add i32 %x, 10\l  br label %B\l}"];
+	Node0x55783a41e000 -> Node0x55783a41e7a0;
+	Node0x55783a41e7a0 [shape=record,label="{B:                                                \l  %a.1 = phi i32 [ %a, %A ], [ %a.0, %E ]\l  %b = add nsw i32 %a.1, 0\l  %tobool = icmp ne i32 %x, 0\l  br i1 %tobool, label %C, label %D\l|{<s0>T|<s1>F}}"];
+	Node0x55783a41e7a0:s0 -> Node0x55783a41ebf0;
+	Node0x55783a41e7a0:s1 -> Node0x55783a41ecc0;
+	Node0x55783a41ebf0 [shape=record,label="{C:                                                \l  br label %E\l}"];
+	Node0x55783a41ebf0 -> Node0x55783a41e8d0;
+	Node0x55783a41ecc0 [shape=record,label="{D:                                                \l  br label %E\l}"];
+	Node0x55783a41ecc0 -> Node0x55783a41e8d0;
+	Node0x55783a41e8d0 [shape=record,label="{E:                                                \l  %a.0 = phi i32 [ 1, %C ], [ 2, %D ]\l  %cmp = icmp eq i32 %a.0, 2\l  br i1 %cmp, label %B, label %F\l|{<s0>T|<s1>F}}"];
+	Node0x55783a41e8d0:s0 -> Node0x55783a41e7a0;
+	Node0x55783a41e8d0:s1 -> Node0x55783a41f130;
+	Node0x55783a41f130 [shape=record,label="{F:                                                \l  ret i32 %x\l}"];
+}
