@@ -6,27 +6,54 @@
 ### Demo 01 : Single Block (No Successor)
 
 Original CFG:
-![](./final/demo01.png)
+![](./final/CFG/demo01.png)
 
 After Modification:
-![](./final/demo01_modified.png)
+![](./final/CFG/demo01_modified.png)
 
 
 ### Demo 02 : Single Block with Single Successors
 
 Original CFG:
-![](./final/demo02.png)
+![](./final/CFG/demo02.png)
 
 After Modification:
-![](./final/demo02_modified.png)
+![](./final/CFG/demo02_modified.png)
 
 ### Demo 3 : A Region of Blocks
 Original CFG:
-![](./final/demo03.png)
+![](./final/CFG/demo03.png)
 
 After Modification:
-![](./final/demo03_modified.png)
+![](./final/CFG/demo03_modified.png)
 
+## Quantitative Results
+
+### Execution Time
+
+Execution environment: Ubuntu 18.04 with 16G memory inside Virtual Box 1.2 hosted by a Windows 10 machine with Intel i7-7700@3.600GHz CPU and 32G RAM.
+
+|Test Program | Before Optimization | After Optimization | Reduction |
+|---|---|---|---|
+|demo01   | 1.828 ns| 1.650 ns | 9.7%|
+| demo02  | 1.708 ns  | 1.682 ns | 1.5%|
+|demo03   | 1.676 ns | 1.455 ns  | 13.2%|
+
+### Code Size 
+
+|Test Program | Before Optimization | After Optimization | Increase |
+|---|---|---|---|
+|demo01   | 1,732 bytes  | 1,836 bytes | 5.6%|
+| demo02  | 1,740 bytes  | 1,840 bytes | 5.4%|
+|demo03   | 1,724 bytes | 1,816 bytes  | 5.1%|
+
+### Constant Propagation
+
+|Test Program | Before Optimization | After Optimization | Increase |
+|---|---|---|---|
+|demo01   | 0  | 2 | -|
+| demo02  | 0  | 2 | -|
+|demo03   | 0 | 3  | -|
 
 ## Usage
 
